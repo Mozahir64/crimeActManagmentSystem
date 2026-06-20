@@ -1,0 +1,313 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+// ============================================================
+// Prisma Schema — Crime Management System
+// DBMS: PostgreSQL
+// ============================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+enum Role {
+  DUTYOFFICER      
+  SI
+  CRIMEANALYST  
+  ADMIN  
+  COMMON
+  OC
+  
+  
+}
+
+enum OfficerRank {
+  DUTYOFFICER     
+  SI
+  CRIMEANALYST
+  ADMIN
+  
+  OC
+  
+  
+}
+
+enum CrimeType {
+  theft
+  domestic_violence
+  cyber_crime
+  fraud
+  extortion
+  drug_offense
+  smuggling
+  vandalism
+  public_disorder
+  corruption
+  others
+}
+
+enum SubmissionStatus {
+ PENDING
+ SUBMITTED
+  REJECTED
+}
+
+enum FileType {
+  document
+  video
+  audio
+  image
+}
+
+enum InvestigationStatus {
+  under_investigation
+  solved
+}
+
+
+enum CaseFlag {
+  red
+  green
+}
+
+enum RiskLevel {
+  low
+  medium
+  high
+}
+
+enum EntityType {
+  complaint
+  case
+  evidence
+  user
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  ASSIGN
+  UNASSIGN
+  STATUS_CHANGE
+}
+
+
+model User {
+  user_id       String   @id @default(uuid()) @db.Uuid   //550e8400-e29b-41d4-a716-446655440000
+  employee_code   String?  @unique              @db.VarChar(50)  
+  user_name     String                        @db.VarChar(100)
+  email         String   @unique              @db.VarChar(150)
+  password_hash String                        @db.Char(60)     
+  role          Role  @default(COMMON)
+  phone_number  String          @unique               @db.VarChar(20)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+ 
+  thana_officer Thana_officer? @relation(fields: [employee_code],references: [employee_id],onDelete: Cascade)
+ 
+  
+
+  complaint_submissions Complaint_submission[]
+  
+  audit_logs            Audit_log[]
+}
+
+
+model Thana_info {
+  geo_code    String   @id         @db.VarChar(20)
+  thana_name  String               @db.VarChar(100)
+  district    String   @unique             @db.VarChar(100)
+  thana_email String  @unique      @db.VarChar(150)   
+  latitude    Decimal?             @db.Decimal(9, 6)
+  
+  longitude   Decimal?             @db.Decimal(9, 6)
+  tel_no      String               @db.VarChar(20)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  thana_officers        Thana_officer[]
+  complaint_submissions Complaint_submission[]
+  crime_analyses        Crime_analysis[]
+}
+
+
+model Thana_officer {
+  employee_id    String      @id         @db.VarChar(50)  
+
+  first_name     String                   @db.VarChar(50)
+  last_name     String?                   @db.VarChar(50)
+  
+  phone_number   String       @unique           @db.VarChar(20)
+  thana_code       String                  @db.VarChar(20)  
+  rank           OfficerRank  
+
+  assignedAt     DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // Relations
+  
+  thana_info Thana_info @relation(fields: [thana_code], references: [geo_code])
+  
+
+  
+  
+  old_assignments    SIAssignment[] @relation("OldOfficer")
+  new_assignments    SIAssignment[] @relation("NewOfficer")
+
+  user User?
+  
+  
+  
+  
+  oc_officer Case_review[]
+}
+
+
+model Complaint_submission {
+  complaint_id      String           @id @default(uuid()) @db.Uuid
+  login_id           String                                @db.Uuid        
+  thana_code          String                                @db.VarChar(20)   
+  area              String                                @db.VarChar(150)
+  crime_type        CrimeType
+  case_description  String                                @db.Text
+  submission_status SubmissionStatus  @default(PENDING)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user           User                            @relation(fields: [login_id ], references: [user_id], onDelete: Cascade)
+  thana_info     Thana_info                      @relation(fields: [thana_code], references: [geo_code])
+  case_evidences Case_evidence[]
+  si_assignments SIAssignment[]
+   
+  
+  
+  
+}
+
+
+model Case_evidence {
+  evidence_id  String   @id @default(uuid()) @db.Uuid
+ 
+  complaint_id String                        @db.Uuid         
+  file_type    FileType
+  file_path    String                        @db.VarChar(500) 
+  uploadedAt   DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  
+  complaint Complaint_submission @relation(fields: [complaint_id], references: [complaint_id],onDelete: Cascade)
+}
+
+
+model SIAssignment {
+  assignment_id   String   @id @default(uuid()) @db.Uuid
+  
+  previous_sI_id   String?                      @db.VarChar(50) 
+  current_SI_id   String                        @db.VarChar(50) 
+  
+  complaint_id    String               @db.Uuid        
+  assignedAt      DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  
+  previous_officer          Thana_officer?        @relation("OldOfficer", fields: [ previous_sI_id], references: [employee_id] )
+  current_officer          Thana_officer        @relation( "NewOfficer",fields: [current_SI_id], references: [employee_id])
+  
+  
+  complaint            Complaint_submission @relation(fields: [complaint_id], references: [complaint_id],onDelete: Cascade)
+  crime_investigations Crime_investigation[]
+
+  
+  
+}
+
+
+model Crime_investigation {
+  investigation_id     String              @id @default(uuid()) @db.Uuid
+  assignment_id  String            @db.Uuid  
+  investigation_status InvestigationStatus @default(under_investigation)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  // Relations
+  assigned_officer SIAssignment @relation(fields: [assignment_id], references: [assignment_id],onDelete: Cascade)
+  case_reviews     Case_review[]
+  
+  
+  
+}
+
+
+
+
+model Case_review {
+  review_id      String   @id            @default(uuid()) @db.Uuid  
+  inves_id       String             @db.Uuid    
+  oc_id         String     @db.VarChar(50)    
+  
+  flag           CaseFlag     @default(green)                                
+  createdAt      DateTime @default(now())
+  
+
+  updatedAt      DateTime @updatedAt
+
+  // Relations 
+  
+  assignment  Crime_investigation @relation(fields: [inves_id], references: [investigation_id],onDelete: Cascade)
+  oc_officer Thana_officer @relation( fields: [oc_id], references: [employee_id] )
+  
+  
+}
+
+
+model Crime_analysis {
+  analysis_id  String    @id @default(uuid()) @db.Uuid
+
+  thana_code   String    @db.VarChar(20)
+  district     String   @db.VarChar(20)
+  crime_type   CrimeType
+  period_start DateTime
+  period_end   DateTime
+  
+
+  risk_level   RiskLevel
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  thana_info Thana_info @relation(fields: [thana_code], references: [geo_code])
+}
+
+
+model Audit_log {
+  log_id      String      @id @default(uuid()) @db.Uuid
+  
+  UserId    String                          @db.Uuid
+  entity_type EntityType
+  action      AuditAction
+  details     String                           @db.Text
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  
+  user User @relation(fields: [UserId], references: [user_id])
+
+}
